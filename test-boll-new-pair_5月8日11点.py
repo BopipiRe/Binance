@@ -2,9 +2,10 @@ import asyncio
 from datetime import datetime, timedelta
 
 import aiohttp
+import numpy as np
 import pandas as pd
 import requests
-import numpy as np
+from win10toast import ToastNotifier
 
 symbols_list_binance = []
 symbols_list_bybit = []
@@ -18,6 +19,24 @@ async def push_wechat(title, pairs):
     url = f"https://www.pushplus.plus/send?token={token}&title={title}&content={pairs}"
     print(f"{title}:{pairs}")
     requests.get(url)
+
+
+async def push_windows(title, pairs):
+    """使用Windows通知"""
+    try:
+        # 初始化通知器
+        toaster = ToastNotifier()
+
+        # 显示通知（标题为交易所名称，内容为交易对信息）
+        toaster.show_toast(
+            title=title,
+            msg=pairs,
+            duration=15,  # 通知显示10秒
+            threaded=True  # 非阻塞模式
+        )
+        print(f"{title}:{pairs}")
+    except Exception as e:
+        print(f"Windows通知发送失败: {str(e)}")
 
 
 async def reset_symbols_have_res():
@@ -337,6 +356,7 @@ async def coordinated_scan():
         current_symbols = set(get_all_futures_symbols_gateio())
         new_symbols = current_symbols - set(symbols_list_gateio)
         if new_symbols:
+            await push_windows("Gate.io", ','.join(new_symbols))
             await push_wechat("Gate.io", ','.join(new_symbols))
             symbols_list_gateio = list(current_symbols)
 
@@ -358,6 +378,7 @@ async def periodic_scan_binance():
             for kline in high_change_klines:
                 direction = "下跌" if kline['is_bearish'] else "上涨"
                 pairs.append(f"{kline['symbol']}: {direction}{kline['price_change']:.2f}%")
+            await push_windows("Binance", ','.join(pairs))
             await push_wechat("Binance", ','.join(pairs))
             symbols_have_res.update(kline['symbol'] for kline in high_change_klines)
 
@@ -366,6 +387,7 @@ async def periodic_scan_binance():
         current_symbols = set(get_all_futures_symbols_binance())
         new_symbols = current_symbols - set(symbols_list_binance)
         if new_symbols:
+            await push_windows("Binance", ','.join(new_symbols))
             await push_wechat("Binance", ','.join(new_symbols))
             symbols_list_binance = list(current_symbols)
     except Exception as e:
