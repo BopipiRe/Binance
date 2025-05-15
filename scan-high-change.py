@@ -8,9 +8,7 @@ import requests
 from win10toast import ToastNotifier
 
 symbols_list_binance = []
-symbols_list_bybit = []
 symbols_list_gateio = []
-symbols_have_res = set()
 
 
 # region 通用
@@ -172,8 +170,6 @@ async def coordinated_scan():
 
         await periodic_scan_binance()
 
-        # 扫描完成后立即重置集合
-        symbols_have_res.clear()
         print(f"已重置去重集合 | 下次扫描时间: {next_scan + timedelta(minutes=5)}")
 
 
@@ -189,7 +185,6 @@ async def periodic_scan_binance():
                 pairs.append(f"{kline['symbol']}: {direction}{kline['price_change']:.2f}%")
             await push_windows("Binance", ','.join(pairs))
             await push_wechat("Binance", ','.join(pairs))
-            symbols_have_res.update(kline['symbol'] for kline in high_change_klines)
 
         # 检测新增合约（独立于涨跌幅扫描）
         global symbols_list_binance
