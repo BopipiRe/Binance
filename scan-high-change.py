@@ -37,7 +37,6 @@ async def push_windows(title, pairs):
         print(f"Windows通知发送失败: {str(e)}")
 # endregion
 
-
 # region Binance
 def get_all_futures_symbols_binance():
     """同步获取所有USDT合约交易对"""
@@ -48,12 +47,12 @@ def get_all_futures_symbols_binance():
     return current_pairs
 
 
-async def get_closed_kline_binance(session, symbol, interval='5m'):
+async def get_closed_kline_binance(session, symbol):
     """异步获取最近一根已闭合的5分钟K线，并计算最高价/最低价到收盘价的幅度"""
     url = "https://fapi.binance.com/fapi/v1/klines"
     params = {
         'symbol': symbol,
-        'interval': interval,
+        'interval': '5m',
         'limit': 2  # 获取最近2根K线
     }
 
@@ -108,10 +107,10 @@ async def get_closed_kline_binance(session, symbol, interval='5m'):
         }
 
 
-async def scan_symbol_binance(session, symbol, results, interval='5m'):
+async def scan_symbol_binance(session, symbol, results):
     """异步扫描单个交易对，基于最高价/最低价到收盘价的幅度条件"""
     try:
-        kline = await get_closed_kline_binance(session, symbol, interval)
+        kline = await get_closed_kline_binance(session, symbol)
         if kline and (abs(kline['price_change']) >= 7):
             results.append(kline)
     except aiohttp.ClientError as e:
@@ -120,12 +119,12 @@ async def scan_symbol_binance(session, symbol, results, interval='5m'):
         print(f"处理{symbol}时发生错误: {str(e)}")
 
 
-async def scan_high_change_contracts_binance(interval='5m'):
+async def scan_high_change_contracts_binance():
     """并发扫描所有合约"""
     async with aiohttp.ClientSession() as session:
         global symbols_list_binance
         results = []
-        tasks = [scan_symbol_binance(session, symbol, results, interval) for symbol in symbols_list_binance]
+        tasks = [scan_symbol_binance(session, symbol, results) for symbol in symbols_list_binance]
         await asyncio.gather(*tasks)  # 并发执行所有任务
 
         if not results:
@@ -148,19 +147,16 @@ def get_all_futures_symbols_gateio():
 
 
 # region Scan
-async def coordinated_scan(interval='5m'):
+async def coordinated_scan():
     """协调三个交易所的扫描任务，并在完成后重置集合"""
-    gap = int(interval[:-1])
     while True:
         now = datetime.now()
-        next_scan = now.replace(second=0, microsecond=0) + timedelta(minutes=(gap - now.minute % gap))
+        next_scan = now.replace(second=0, microsecond=0) + timedelta(minutes=(5 - now.minute % 5))
         delay = (next_scan - now).total_seconds()
         if delay > 0:
-            if interval == '15m':
-                delay = delay + 30
             await asyncio.sleep(delay)
 
-        print(f"\n===== 开始 {interval} 全量扫描 {datetime.now()} =====")
+        print(f"\n===== 开始全量扫描 {datetime.now()} =====")
 
         global symbols_list_gateio
         current_symbols = set(get_all_futures_symbols_gateio())
@@ -172,14 +168,14 @@ async def coordinated_scan(interval='5m'):
 
         await periodic_scan_binance()
 
-        print(f"下次扫描时间: {next_scan + timedelta(minutes=gap)}")
+        print(f"下次扫描时间: {next_scan + timedelta(minutes=5)}")
 
 
-async def periodic_scan_binance(interval='5m'):
+async def periodic_scan_binance():
     """Binance扫描（不再包含循环，单次执行）"""
     try:
         print(f"[Binance] 扫描启动 {datetime.now()}")
-        high_change_klines = await scan_high_change_contracts_binance(interval)
+        high_change_klines = await scan_high_change_contracts_binance()
         if high_change_klines:
             pairs = []
             for kline in high_change_klines:
@@ -205,7 +201,4 @@ if __name__ == "__main__":
     symbols_list_binance = get_all_futures_symbols_binance()
     symbols_list_gateio = get_all_futures_symbols_gateio()
     # 启动主循环
-    tasks = [coordinated_scan('5m'),  coordinated_scan('15m')]
-    loop = asyncio.get_event_loop()
-    # 同时运行两个协程
-    loop.run_until_complete(asyncio.gather(*tasks))
+    asyncio.run(coordinated_scan())
