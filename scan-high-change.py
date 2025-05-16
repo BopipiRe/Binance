@@ -35,6 +35,8 @@ async def push_windows(title, pairs):
         print(f"{title}:{pairs}")
     except Exception as e:
         print(f"Windows通知发送失败: {str(e)}")
+
+
 # endregion
 
 # region Binance
@@ -133,6 +135,8 @@ async def scan_high_change_contracts_binance():
 
         # 直接返回结果列表，不进行排序
         return sorted(results, key=lambda x: abs(x['price_change']), reverse=True)
+
+
 # endregion
 
 
@@ -143,6 +147,21 @@ def get_all_futures_symbols_gateio():
     response = requests.get(url)
     data = response.json()
     return [s["name"] for s in data if s["in_delisting"] is False]  # 排除已下架合约
+
+
+async def get_new_symbol_gateio():
+    try:
+        global symbols_list_gateio
+        current_symbols = set(get_all_futures_symbols_gateio())
+        new_symbols = current_symbols - set(symbols_list_gateio)
+        if new_symbols:
+            await push_windows("Gate.io", ','.join(new_symbols))
+            await push_wechat("Gate.io", ','.join(new_symbols))
+            symbols_list_gateio = list(current_symbols)
+    except Exception as e:
+        print(f"[Gate.io] 扫描错误: {str(e)}")
+
+
 # endregion
 
 
@@ -158,14 +177,7 @@ async def coordinated_scan():
 
         print(f"\n===== 开始全量扫描 {datetime.now()} =====")
 
-        global symbols_list_gateio
-        current_symbols = set(get_all_futures_symbols_gateio())
-        new_symbols = current_symbols - set(symbols_list_gateio)
-        if new_symbols:
-            await push_windows("Gate.io", ','.join(new_symbols))
-            await push_wechat("Gate.io", ','.join(new_symbols))
-            symbols_list_gateio = list(current_symbols)
-
+        await get_new_symbol_gateio()
         await periodic_scan_binance()
 
         print(f"下次扫描时间: {next_scan + timedelta(minutes=5)}")
@@ -194,6 +206,8 @@ async def periodic_scan_binance():
             symbols_list_binance = list(current_symbols)
     except Exception as e:
         print(f"[Binance] 扫描错误: {str(e)}")
+
+
 # endregion
 
 # 运行事件循环
