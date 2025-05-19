@@ -111,6 +111,8 @@ async def scan_binance() -> None:
                 )
 
         if results:
+            import pyperclip
+            pyperclip.copy(results[0].split(':')[0])
             await push_wechat("Binance波动", ','.join(results))
             await push_windows("Binance波动", ','.join(results))
         else:
