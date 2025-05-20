@@ -7,5 +7,14 @@
       "profit": 1.19
     }
   ],
-  "lose": {}
+  "lose": {
+    "PROMPTUSDT": [
+      {
+        "pair": "PROMPTUSDT",
+        "direction": "long",
+        "time": "2025-05-20 15:33:08",
+        "profit": -0.35
+      }
+    ]
+  }
 }

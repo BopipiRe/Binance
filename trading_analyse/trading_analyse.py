@@ -26,25 +26,49 @@ def save_data(data: DataStructure) -> None:
 
 
 def show_statistics(data: DataStructure) -> None:
-    """展示增强版交易统计数据（含利润分析）"""
+    """展示增强版交易统计数据（含方向分类）"""
+
+    def _calc_stats(records: List[TradeRecord]) -> Dict[str, Dict[str, float]]:
+        """计算指定记录集的多空分类统计"""
+        stats = {
+            "LONG": {"count": 0, "profit": 0.0},
+            "SHORT": {"count": 0, "profit": 0.0}
+        }
+        for r in records:
+            direction = r["direction"].upper()
+            stats[direction]["count"] += 1
+            stats[direction]["profit"] += float(r.get("profit", 0))
+        return stats
+
+    # 盈利交易统计
+    win_stats = _calc_stats(data["win"])
     total_win = len(data["win"])
-    total_lose = sum(len(v) for v in data["lose"].values())
+    total_win_profit = sum(float(r.get("profit", 0)) for r in data["win"])
 
-    # 利润统计
-    total_profit = sum(float(r.get("profit", 0)) for r in data["win"])
-    avg_profit = total_profit / total_win if total_win > 0 else 0
+    # 亏损交易统计
+    lose_records = [r for pair in data["lose"].values() for r in pair]
+    lose_stats = _calc_stats(lose_records)
+    total_lose = len(lose_records)
+    total_lose_loss = sum(float(r.get("profit", 0)) for r in lose_records)
 
-    # 亏损统计
-    total_loss = sum(float(r.get("profit", 0)) for pair in data["lose"].values() for r in pair)
-    avg_loss = total_loss / total_lose if total_lose > 0 else 0
+    # 打印基础统计
+    print("\n=== 全局统计 ===")
+    print(f"总交易: {total_win + total_lose}笔 | 胜率: "
+          f"{(total_win / (total_win + total_lose) * 100):.1f}%" if (total_win + total_lose) > 0 else "N/A")
+    print(f"净收益: ${total_win_profit + total_lose_loss:+,.2f}")
 
-    print("\n=== 交易统计 ===")
-    print(f"盈利交易: {total_win}笔 | 亏损交易: {total_lose}笔")
-    print(f"胜率: {total_win / (total_win + total_lose) * 100:.1f}%" if (total_win + total_lose) > 0 else "胜率: N/A")
-    print("\n=== 利润分析 ===")
-    print(f"总利润: ${total_profit:,.2f} | 平均利润: ${avg_profit:,.2f}")
-    print(f"总亏损: ${abs(total_loss):,.2f} | 平均亏损: ${abs(avg_loss):,.2f}")
-    print(f"净收益: ${total_profit + total_loss:,.2f}")  # 亏损为负值已自动计算
+    # 打印多空分类统计
+    print("\n=== 多空分类统计 ===")
+    for direction in ["LONG", "SHORT"]:
+        win_pct = (win_stats[direction]["count"] / total_win * 100) if total_win > 0 else 0
+        lose_pct = (lose_stats[direction]["count"] / total_lose * 100) if total_lose > 0 else 0
+
+        print(f"\n【{direction}方向】")
+        print(f"盈利交易: {win_stats[direction]['count']}笔 ({win_pct:.1f}%) | "
+              f"总利润: ${win_stats[direction]['profit']:+,.2f}")
+        print(f"亏损交易: {lose_stats[direction]['count']}笔 ({lose_pct:.1f}%) | "
+              f"总亏损: ${lose_stats[direction]['profit']:+,.2f}")
+        print(f"净收益: ${win_stats[direction]['profit'] + lose_stats[direction]['profit']:+,.2f}")
 
 
 def input_float(prompt: str) -> float:
@@ -98,17 +122,19 @@ def add_record_interactive() -> None:
 
 
 def query_records() -> None:
-    """带利润显示的查询功能"""
+    """带方向分类的查询功能"""
     data = load_data()
 
     print("\n=== 盈利交易 ===")
     for i, r in enumerate(data["win"], 1):
-        print(f"{i}. {r['time']} {r['pair']} {r['direction']} | 利润: ${float(r.get('profit', 0)):+,.2f}")
+        print(f"{i}. {r['time']} {r['pair']} {r['direction'].upper()} | "
+              f"利润: ${float(r.get('profit', 0)):+,.2f}")
 
     print("\n=== 亏损交易 ===")
     for pair, records in data["lose"].items():
         for i, r in enumerate(records, 1):
-            print(f"{i}. {r['time']} {pair} {r['direction']} | 亏损: ${float(r.get('profit', 0)):+,.2f}")
+            print(f"{i}. {r['time']} {pair} {r['direction'].upper()} | "
+                  f"亏损: ${float(r.get('profit', 0)):+,.2f}")
 
 
 def main_menu() -> None:
@@ -117,7 +143,7 @@ def main_menu() -> None:
         print("\n===== 外汇交易记录系统 =====")
         print("1. 新建交易记录")
         print("2. 查看完整记录")
-        print("3. 显示统计报告")
+        print("3. 显示统计报告（含多空分类）")
         print("4. 退出系统")
 
         choice = input("请选择操作: ").strip()
