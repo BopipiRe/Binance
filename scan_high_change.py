@@ -148,10 +148,10 @@ async def scan_gateio() -> None:
 async def main_loop() -> None:
     """主循环（改用asyncio.sleep简化时间计算）"""
     while True:
-        print(f"\n==== 扫描开始 {datetime.utcnow()} ====")
+        print(f"\n==== 扫描开始 {datetime.now()} ====")
         await scan_binance()
         # await asyncio.gather(scan_binance(), scan_gateio())
-        now = datetime.utcnow()
+        now = datetime.now()
         current_seconds = now.minute * 60 + now.second
         delay = (300 - current_seconds % 300) % 300  # 处理余数为0的情况
         await asyncio.sleep(delay)
